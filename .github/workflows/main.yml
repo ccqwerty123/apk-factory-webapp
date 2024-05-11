@@ -1,0 +1,21 @@
+name: Periodic Webpage Refresh
+
+on:
+  schedule:
+    # 设置为每5分钟执行一次
+    - cron: '*/5 * * * *'
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+      
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+    
+    - name: Execute refresh script
+      run: python refresh_script.py
