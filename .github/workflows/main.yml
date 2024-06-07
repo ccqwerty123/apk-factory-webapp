@@ -1,25 +1,20 @@
-name: Periodic Webpage Refresh
+name: Example Workflow
 
-on:
-  schedule:
-    # 设置为每5分钟执行一次
-    - cron: '*/5 * * * *'
-  workflow_dispatch:
+on: 
+  workflow_dispatch: # This trigger allows you to manually trigger the workflow
+    inputs:
+      message:
+        description: 'A message for the workflow'
+        required: true
+        default: 'Hello, World!'
 
 jobs:
-  refresh:
+  build:
     runs-on: ubuntu-latest
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
-      
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.x'
-    
-    - name: Install dependencies
-      run: pip install requests
-    
-    - name: Execute refresh script
-      run: python refresh_script.py
+
+    - name: Print input message
+      run: echo "${{ github.event.inputs.message }}"
