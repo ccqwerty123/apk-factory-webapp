@@ -13,10 +13,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
-        # 输出检查点
-        with:
-          ref: ${{ github.head_ref || github.ref }}
-      
+
       - name: Debug: Show current directory and list files before creation
         run: |
           echo "Current directory:"
@@ -44,7 +41,7 @@ jobs:
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Debug: Check if file is pushed
         run: |
           echo "Files after push:"
