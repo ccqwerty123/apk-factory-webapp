@@ -1,7 +1,7 @@
-name: Example Workflow
+name: Python Function Trigger
 
 on: 
-  workflow_dispatch: # This trigger allows you to manually trigger the workflow
+  workflow_dispatch:  # This trigger allows you to manually trigger the workflow
     inputs:
       message:
         description: 'A message for the workflow'
@@ -9,12 +9,17 @@ on:
         default: 'Hello, World!'
 
 jobs:
-  build:
+  trigger_python_function:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Print input message
-      run: echo "${{ github.event.inputs.message }}"
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Run Python script
+      run: python3 script.py "${{ github.event.inputs.message }}"
