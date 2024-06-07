@@ -27,7 +27,7 @@ jobs:
           echo "Content of example.txt:"
           cat example.txt
 
-      - name: Debug: Show current directory and list files after creation
+      - name: DebugShow current directory and list files after creation
         run: |
           echo "Files after creation:"
           ls -al
@@ -42,7 +42,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Debug: Check if file is pushed
+      - name: DebugCheck if file is pushed
         run: |
           echo "Files after push:"
           ls -al
