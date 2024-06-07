@@ -1,25 +1,51 @@
-name: Python Function Trigger
+name: Create File Example with Debugging
 
-on: 
-  workflow_dispatch:  # This trigger allows you to manually trigger the workflow
+on:
+  workflow_dispatch:
     inputs:
       message:
-        description: 'A message for the workflow'
+        description: 'Message to include in the file'
         required: true
-        default: 'Hello, World!'
 
 jobs:
-  trigger_python_function:
+  example_job:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        # 输出检查点
+        with:
+          ref: ${{ github.head_ref || github.ref }}
+      
+      - name: Debug: Show current directory and list files before creation
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Files before creation:"
+          ls -al
 
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.x'
+      - name: Create a file
+        run: |
+          echo "${{ github.event.inputs.message }}" > example.txt
+          echo "Content of example.txt:"
+          cat example.txt
+      
+      - name: Debug: Show current directory and list files after creation
+        run: |
+          echo "Files after creation:"
+          ls -al
 
-    - name: Run Python script
-      run: python3 script.py "${{ github.event.inputs.message }}"
+      - name: Commit and push the file
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add example.txt
+          git commit -m "Create example.txt with message"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Debug: Check if file is pushed
+        run: |
+          echo "Files after push:"
+          ls -al
