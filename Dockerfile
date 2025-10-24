@@ -12,9 +12,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# 复制我们预先下载好的工具到镜像中
-# 这一步假设 'tools' 文件夹在构建时的上下文中
-COPY tools/ /app/tools/
+# --- [!!! 核心修改区域 !!!] ---
+# 复制我们预先下载并压缩好的工具包
+COPY tools/android-sdk.tar.gz /app/tools/
+COPY tools/apktool.jar /app/tools/
+
+# 运行 tar 命令解压工具包，并清理原始压缩文件
+# -C /app/tools/ 表示在解压前先进入 /app/tools 目录，确保解压后的目录结构正确
+RUN tar -xzf /app/tools/android-sdk.tar.gz -C /app/tools/ \
+    && rm /app/tools/android-sdk.tar.gz
+# --- [!!! 修改结束 !!!] ---
+
 
 # [Stage 2: 安装 Python 依赖]
 # 复制需求文件
@@ -40,7 +48,5 @@ EXPOSE 5000
 RUN mkdir -p /app/output && mkdir -p /app/working
 
 # 容器启动时运行的命令
-# 使用 gunicorn 运行，它是一个更稳定的生产环境服务器
-# CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
 # 为了方便调试，我们先用 Flask 自带的服务器
 CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
