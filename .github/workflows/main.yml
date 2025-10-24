@@ -1,48 +1,45 @@
-name: Create File Example with Debugging
+# 1. 工作流的名称，会显示在 Actions 页面上
+name: Manual Docker Build and Push
 
+# 2. 触发条件：on: workflow_dispatch 表示这是一个手动触发的工作流
 on:
   workflow_dispatch:
-    inputs:
-      message:
-        description: 'Message to include in the file'
-        required: true
 
+# 3. 定义工作任务
 jobs:
-  example_job:
+  # 我们只有一个任务，名为 build-and-push
+  build-and-push:
+    # 任务运行的环境：使用最新的 Ubuntu 系统
     runs-on: ubuntu-latest
+
+    # 任务包含的一系列步骤
     steps:
+      # 第1步：检出代码
+      # 这个步骤会从你的仓库中把所有文件（app.py, Dockerfile等）下载到运行环境中
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: DebugShow current directory and list files before creation
-        run: |
-          echo "Current directory:"
-          pwd
-          echo "Files before creation:"
-          ls -al
+      # 第2步：登录到 Docker Hub
+      # 使用你之前在 Secrets 中设置的用户名和访问令牌
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Create a file
-        run: |
-          echo "${{ github.event.inputs.message }}" > example.txt
-          echo "Content of example.txt:"
-          cat example.txt
-
-      - name: DebugShow current directory and list files after creation
-        run: |
-          echo "Files after creation:"
-          ls -al
-
-      - name: Commit and push the file
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add example.txt
-          git commit -m "Create example.txt with message"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: DebugCheck if file is pushed
-        run: |
-          echo "Files after push:"
-          ls -al
+      # 第3步：构建并推送 Docker 镜像
+      # 这是核心步骤，它会读取 Dockerfile，构建镜像，然后推送到你的 Docker Hub 账号
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          # context: . 表示 Dockerfile 位于仓库的根目录
+          context: .
+          # push: true 表示在成功构建后，将镜像推送到 Docker Hub
+          push: true
+          # tags: 定义镜像的标签。这是最重要的部分！
+          # 我们会给镜像打上两个标签：
+          # 1. 'latest'：表示这是最新版本
+          # 2. GitHub Actions 的运行ID：一个唯一的数字，方便你追踪每个版本
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/apk-factory-webapp:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/apk-factory-webapp:${{ github.run_id }}
