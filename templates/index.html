@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APK Factory Pro</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f4f7f9; color: #333; line-height: 1.6; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        h1, h2 { color: #2c3e50; border-bottom: 2px solid #eef2f5; padding-bottom: 10px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        input[type="text"], input[type="number"] { width: calc(100% - 22px); padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+        .button { background-color: #3498db; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        .button-primary { background-color: #2ecc71; }
+        .search-results { margin-top: 20px; }
+        .app-item { display: flex; align-items: center; padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 10px; cursor: pointer; transition: background-color 0.2s; }
+        .app-item:hover { background-color: #f0f8ff; }
+        .app-item input[type="radio"] { margin-right: 15px; }
+        .app-icon { width: 50px; height: 50px; border-radius: 8px; margin-right: 15px; flex-shrink: 0; }
+        .app-details { flex-grow: 1; }
+        .app-details strong { font-size: 1.1em; }
+        .message { padding: 15px; border-radius: 5px; margin-top: 20px; }
+        .message.success { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+        .message.error { background-color: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+        .permissions-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; margin-top: 10px; background-color: #fafafa; padding: 15px; border-radius: 5px; border: 1px solid #eee; }
+        .permission-item { display: flex; align-items: center; font-family: monospace; font-size: 0.9em; }
+        .permission-item input { margin-right: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>APK Factory Pro</h1>
+
+        <!-- 搜索模块 -->
+        <div id="search-section">
+            <h2>1. 搜索应用信息 (可选)</h2>
+            <form action="/" method="post">
+                <input type="text" name="query" value="{{ query or '' }}" placeholder="例如：王者荣耀">
+                <button type="submit" class="button">搜索</button>
+            </form>
+        </div>
+
+        <!-- 生成表单 -->
+        <form action="/generate" method="post">
+            {% if search_results %}
+            <h2>2. 选择一个结果</h2>
+            <div class="search-results">
+                {% for app in search_results %}
+                <label class="app-item" for="app-{{ loop.index0 }}">
+                    <input type="radio" id="app-{{ loop.index0 }}" name="selected_app" value="{{ app | tojson | e }}" {% if loop.first %}checked{% endif %} onclick="updateForm(this.value)">
+                    <img src="{{ app.icon_url }}" alt="icon" class="app-icon">
+                    <div class="app-details">
+                        <strong>{{ app.app_name }}</strong> ({{ app.version_name }})<br>
+                        <small>{{ app.package_name }} - by {{ app.developer }}</small>
+                    </div>
+                </label>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <h2>{{ "3. 确认或修改信息" if search_results else "2. 输入应用信息" }}</h2>
+            <div class="form-group"><label for="app_name">应用显示名称</label><input type="text" id="app_name" name="app_name" value="{{ initial_values.app_name }}" required></div>
+            <div class="form-group"><label for="package_name">应用包名</label><input type="text" id="package_name" name="package_name" value="{{ initial_values.package_name }}" required></div>
+            <div class="form-group"><label for="version_name">版本名</label><input type="text" id="version_name" name="version_name" value="{{ initial_values.version_name }}" required></div>
+            <div class="form-group"><label for="version_code">版本代码</label><input type="number" id="version_code" name="version_code" value="{{ initial_values.version_code }}" required></div>
+
+            <!-- 权限管理模块 -->
+            <h2>{{ "4. 权限管理" if search_results else "3. 权限管理" }}</h2>
+            <div class="permissions-grid">
+                {% if all_permissions %}
+                    {% for perm in all_permissions %}
+                    <div class="permission-item">
+                        <!-- [修改] 移除了 'checked' 属性，使其默认不选中 -->
+                        <input type="checkbox" id="perm-{{ loop.index0 }}" name="permissions_to_keep" value="{{ perm }}">
+                        <label for="perm-{{ loop.index0 }}">{{ perm.split('.')[-1] }}</label>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p>模板APK中未找到任何权限声明。</p>
+                {% endif %}
+            </div>
+
+            <br>
+            <button type="submit" class="button button-primary">生成 APK</button>
+        </form>
+        
+        <!-- 结果消息 -->
+        {% if download_link %}<div class="message success"><strong>生成成功!</strong><br><a href="{{ download_link }}" download>点击这里下载：{{ apk_filename }}</a></div>{% endif %}
+        {% if error_message %}<div class="message error"><strong>生成失败!</strong><br><p>错误详情: {{ error_message }}</p></div>{% endif %}
+    </div>
+
+    <script>
+        function updateForm(appData) {
+            const app = JSON.parse(appData);
+            document.getElementById('app_name').value = app.app_name;
+            document.getElementById('package_name').value = app.package_name;
+            document.getElementById('version_name').value = app.version_name;
+            document.getElementById('version_code').value = 1;
+        }
+    </script>
+</body>
+</html>
