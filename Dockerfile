@@ -6,10 +6,13 @@ WORKDIR /app
 
 # [Stage 1: 安装系统依赖和工具]
 # 安装 Java (Apktool 需要) 和其他必要工具
+# !!! 修改：添加 build-essential 和 libdbus-1-dev 来支持编译 C 代码的 Python 包 !!!
 RUN apt-get update && apt-get install -y --no-install-recommends \
     default-jre-headless \
     wget \
     unzip \
+    build-essential \
+    libdbus-1-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # --- [!!! 核心修改区域 !!!] ---
