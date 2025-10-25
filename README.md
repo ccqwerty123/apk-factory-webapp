@@ -1,6 +1,6 @@
 # APK Factory Pro 🎭
 
-![APK Factory Pro](https://raw.githubusercontent.com/ccqwerty123/apk-factory-webapp/refs/heads/main/2025-10-25.webpg)  <!-- 建议在这里放一张项目界面的截图 -->
+![APK Factory Pro](https://raw.githubusercontent.com/ccqwerty123/apk-factory-webapp/refs/heads/main/2025-10-25.webp)  <!-- 建议在这里放一张项目界面的截图 -->
 
 一个用于快速生成“伪装”APK 的在线工具。它通过将目标应用的信息（如名称、包名、图标）注入到一个干净的模板 APK 中，实现快速“换皮”，生成一个全新的 APK。
 
