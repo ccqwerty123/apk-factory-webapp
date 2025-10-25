@@ -1,56 +1,56 @@
-# 使用官方的 Python 3.9 slim 版本作为基础镜像
-FROM python:3.9-slim
+# [Stage 0: 选择基础镜像]
+# 使用官方的 Ubuntu 22.04 LTS 作为基础镜像，以确保与测试环境一致
+FROM ubuntu:22.04
+
+# 设置环境变量，防止 apt-get 在安装时弹出交互式对话框
+ENV DEBIAN_FRONTEND=noninteractive
 
 # 设置工作目录
 WORKDIR /app
 
-# [Stage 1: 安装系统依赖和工具]
-# 安装 Java (Apktool 需要) 和其他必要工具
-# !!! 修改：添加 libglib2.0-dev，这是 dbus-python 编译时需要的另一个依赖 !!!
+# [Stage 1: 安装所有系统依赖]
+# 在一个步骤中，安装所有需要的系统软件包
+# 这包括：Python 3.9, Pip, Java, 以及编译 dbus-python 所需的所有工具和库
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Python 环境
+    python3.9 \
+    python3-pip \
+    python3.9-venv \
+    # Java 环境 (Apktool 需要)
     default-jre-headless \
-    wget \
-    unzip \
+    # 之前发现的所有编译依赖
     build-essential \
     libdbus-1-dev \
     libglib2.0-dev \
+    dbus \
+    # 应用需要的其他工具
+    wget \
+    unzip \
+    # 清理 apt 缓存，减小镜像体积
     && rm -rf /var/lib/apt/lists/*
 
-# --- [!!! 核心修改区域 !!!] ---
-# 复制我们预先下载并压缩好的工具包
+# [Stage 2: 复制和解压工具包]
+# 这一部分保持不变
 COPY tools/android-sdk.tar.gz /app/tools/
 COPY tools/apktool.jar /app/tools/
-
-# 运行 tar 命令解压工具包，并清理原始压缩文件
-# -C /app/tools/ 表示在解压前先进入 /app/tools 目录，确保解压后的目录结构正确
 RUN tar -xzf /app/tools/android-sdk.tar.gz -C /app/tools/ \
     && rm /app/tools/android-sdk.tar.gz
-# --- [!!! 修改结束 !!!] ---
 
-
-# [Stage 2: 安装 Python 依赖]
+# [Stage 3: 安装 Python 依赖]
 # 复制需求文件
 COPY requirements.txt .
-
-# 安装 Python 库
+# 使用 pip 安装 Python 库 (现在系统中有完整的编译环境，应该会很顺利)
 RUN pip install --no-cache-dir -r requirements.txt
 
-# [Stage 3: 复制应用代码]
-# 复制 templates 文件夹
+# [Stage 4: 复制应用代码]
+# 这一部分保持不变
 COPY templates/ /app/templates/
-# 复制输入模板和密钥
 COPY input/ /app/input/
 COPY secure/ /app/secure/
-# 复制主应用文件
 COPY app.py .
 
-# [Stage 4: 配置和运行]
-# 暴露 Flask 运行的端口
+# [Stage 5: 配置和运行]
+# 这一部分保持不变
 EXPOSE 5000
-
-# 创建必要的文件夹，防止运行时因缺少目录而出错
 RUN mkdir -p /app/output && mkdir -p /app/working
-
-# 容器启动时运行的命令
-# 为了方便调试，我们先用 Flask 自带的服务器
 CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]```
