@@ -38,8 +38,8 @@ RUN tar -xzf /app/tools/android-sdk.tar.gz -C /app/tools/ \
 # [Stage 3: 安装 Python 依赖]
 # 复制需求文件
 COPY requirements.txt .
-# 使用系统默认的 python3 和 pip 进行安装
-RUN python3 -m pip install --no-cache-dir -r requirements.txt
+# 核心修改：添加 --break-system-packages 标志来绕过 PEP 668 的外部环境管理保护
+RUN python3 -m pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 # [Stage 4: 复制应用代码]
 COPY templates/ /app/templates/
