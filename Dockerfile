@@ -1,5 +1,5 @@
 # [Stage 1: 使用完整版 Python 镜像]
-FROM python:3.12
+FROM python:3.9-slim
 
 # 设置环境变量
 ENV DEBIAN_FRONTEND=noninteractive
