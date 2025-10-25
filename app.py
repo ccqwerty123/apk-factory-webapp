@@ -205,6 +205,7 @@ def repackage_apk(config: dict) -> str:
     finally:
         if os.path.exists(task_dir): shutil.rmtree(task_dir)
 
+
 # ==============================================================================
 # 4. Flask Web 路由 (已升级)
 # ==============================================================================
@@ -214,8 +215,22 @@ def index():
     search_results, query = [], ""
     if request.method == 'POST':
         query = request.form.get('query', '')
-        if query: search_results = search_and_parse(query)
-    
+        if query: 
+            search_results_raw = search_and_parse(query)
+            
+            # --- [核心修改开始] ---
+            # 为了绕过模板中可能存在问题的 `tojson` 过滤器，我们在此处手动为每个结果生成一个干净的JSON字符串。
+            processed_results = []
+            for app_dict in search_results_raw:
+                # 使用Python内置的、绝对可靠的 `json` 库来创建JSON字符串。
+                # `ensure_ascii=False` 确保中文字符不会被转义成 \uXXXX 的形式，更具可读性。
+                app_dict['json_str'] = json.dumps(app_dict, ensure_ascii=False)
+                processed_results.append(app_dict)
+            
+            # 使用我们处理过的新列表进行后续操作
+            search_results = processed_results
+            # --- [核心修改结束] ---
+
     initial_values = DEFAULT_APP_INFO
     if search_results:
         first = search_results[0]
@@ -225,6 +240,7 @@ def index():
     all_permissions = get_apk_permissions(TEMPLATE_APK_PATH)
 
     return render_template('index.html', search_results=search_results, query=query, initial_values=initial_values, all_permissions=all_permissions)
+
 
 @app.route('/generate', methods=['POST'])
 def generate():
