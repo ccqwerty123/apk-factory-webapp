@@ -12,10 +12,11 @@ WORKDIR /app
 # 在一个步骤中，安装所有需要的系统软件包
 # 使用 Ubuntu 24.04 官方源提供的最新稳定版本
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Python 环境 (系统默认最新版，通常是 Python 3.12)
+    # Python 环境 (系统默认最新版)
     python3 \
     python3-pip \
     python3-venv \
+    python3-dev \
     # Java 环境 (Apktool 需要)
     default-jre-headless \
     # 编译 dbus-python 所需的所有工具和库
@@ -38,7 +39,7 @@ RUN tar -xzf /app/tools/android-sdk.tar.gz -C /app/tools/ \
 # [Stage 3: 安装 Python 依赖]
 # 复制需求文件
 COPY requirements.txt .
-# 核心修改：添加 --break-system-packages 标志来绕过 PEP 668 的外部环境管理保护
+# 添加 --break-system-packages 标志来绕过 PEP 668 的外部环境管理保护
 RUN python3 -m pip install --no-cache-dir --break-system-packages -r requirements.txt
 
 # [Stage 4: 复制应用代码]
