@@ -1,5 +1,5 @@
 # [Stage 1: 选择一个高效的 Python 基础镜像]
-FROM python:3.12-slim
+FROM python:3.12
 
 # 设置环境变量
 ENV DEBIAN_FRONTEND=noninteractive
