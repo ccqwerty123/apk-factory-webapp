@@ -44,4 +44,4 @@ RUN mkdir -p /app/output && mkdir -p /app/working
 EXPOSE 5000
 
 # 使用 Flask 内置服务器运行。对于生产部署，可以考虑换成 Gunicorn。
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]```
+CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
