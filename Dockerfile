@@ -7,7 +7,7 @@ WORKDIR /app
 # [Stage 1: 安装系统依赖和工具]
 # 安装 Java (Apktool 需要) 和其他必要工具
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    openjdk-11-jre-headless \
+    default-jre-headless \
     wget \
     unzip \
     && rm -rf /var/lib/apt/lists/*
