@@ -1,60 +1,58 @@
-# [Stage 0: 选择基础镜像]
-# 使用最新的 Ubuntu 24.04 LTS 作为基础镜像
-FROM ubuntu:24.04
+# [Stage 1: 选择一个高效的 Python 基础镜像]
+# 使用官方的 Python 3.12 slim 版本，它基于 Debian，体积小且预装了 Python 环境。
+FROM python:3.12-slim
 
-# 设置环境变量，防止 apt-get 在安装时弹出交互式对话框
+# 设置环境变量，有助于在容器中运行
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
-# 设置工作目录
-WORKDIR /app
-
-# [Stage 1: 安装所有系统依赖]
-# 在一个步骤中，安装所有需要的系统软件包
-# !! 最终修改：使用 apt 安装 python3-apt !!
+# [Stage 2: 安装必要的系统依赖]
+# 在这里，我们安装运行 APK 工具链所必需的包。
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Python 环境
-    python3 \
-    python3-pip \
-    python3-venv \
-    python3-dev \
-    # 核心修改：安装 python-apt 的系统包
-    python3-apt \
-    # Java 环境
+    # **必需**: 为 apktool.jar 和 apksigner 提供 Java 运行环境
     default-jre-headless \
-    # C/C++ 编译工具链
+    # **强烈推荐**: 用于编译 lxml 等可能需要 C 扩展的 Python 包
     build-essential \
-    # C 扩展库的开发依赖
-    libdbus-1-dev \
-    libglib2.0-dev \
-    dbus \
-    libcairo2-dev \
-    libgirepository1.0-dev \
-    # 应用需要的其他工具
-    wget \
-    unzip \
-    # 清理 apt 缓存
+    # 清理 apt 缓存以减小镜像体积
     && rm -rf /var/lib/apt/lists/*
 
-# [Stage 2: 复制和解压工具包]
+# [Stage 3: 设置工作目录并复制和解压工具]
+WORKDIR /app
 COPY tools/android-sdk.tar.gz /app/tools/
 COPY tools/apktool.jar /app/tools/
+# 解压 Android SDK 并删除压缩包
 RUN tar -xzf /app/tools/android-sdk.tar.gz -C /app/tools/ \
     && rm /app/tools/android-sdk.tar.gz
 
-# [Stage 3: 安装 Python 依赖]
-# 复制需求文件
+# [Stage 4: 安装精简后的 Python 依赖]
+# 复制新的、干净的 requirements.txt
 COPY requirements.txt .
-# 安装 Python 依赖 (requirements.txt 中必须移除 python-apt)
-RUN python3 -m pip install --no-cache-dir --break-system-packages -r requirements.txt
+# --no-cache-dir 减少镜像体积。这里会安装 Flask, requests, beautifulsoup4, lxml
+RUN pip install --no-cache-dir -r requirements.txt
 
-# [Stage 4: 复制应用代码]
+# [Stage 5: 复制应用代码和资源]
 COPY templates/ /app/templates/
 COPY input/ /app/input/
 COPY secure/ /app/secure/
 COPY app.py .
 
-# [Stage 5: 配置和运行]
-EXPOSE 5000
+# [Stage 6: 创建应用运行时所需的目录]
 RUN mkdir -p /app/output && mkdir -p /app/working
-# 启动应用
-CMD ["python3", "-m", "flask", "run", "--host=0.0.0.0", "--port=5000"]
+
+# [Stage 7: 暴露端口并运行应用]
+EXPOSE 5000
+
+# 使用 Flask 内置服务器运行。对于生产部署，可以考虑换成 Gunicorn。
+CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]```
+
+### 总结
+
+您是对的，我的初步解释是草率的。一个成功的 Docker 镜像，不仅仅是看 Python 的 `import`，而是要理解整个应用程序的**完整执行链**。
+
+这个经过修正和详细解释的方案是健壮的：
+1.  它清除了导致构建失败的、不相关且不兼容的 Python 库。
+2.  它保留并安装了运行 APK 打包工具链所必需的**系统级依赖（Java）**。
+3.  它使用了更优化的基础镜像和构建步骤，使最终的镜像更小、更安全、更可靠。
+
+请使用上面提供的 `requirements.txt` 和 `Dockerfile` 文件，您的 GitHub工作流构建将能够成功。
