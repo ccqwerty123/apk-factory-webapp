@@ -48,7 +48,7 @@
             <div class="search-results">
                 {% for app in search_results %}
                 <label class="app-item" for="app-{{ loop.index0 }}">
-                    <input type="radio" id="app-{{ loop.index0 }}" name="selected_app" value="{{ app | tojson | e }}" {% if loop.first %}checked{% endif %} onclick="updateForm(this.value)">
+                    <input type="radio" id="app-{{ loop.index0 }}" name="selected_app" value="{{ app.json_str }}" {% if loop.first %}checked{% endif %} onclick="updateForm(this.value)">
                     <img src="{{ app.icon_url }}" alt="icon" class="app-icon">
                     <div class="app-details">
                         <strong>{{ app.app_name }}</strong> ({{ app.version_name }})<br>
