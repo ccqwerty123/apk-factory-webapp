@@ -111,26 +111,59 @@ def run_command(command: str, suppress_output: bool = False):
     if process.returncode != 0:
         raise subprocess.CalledProcessError(process.returncode, command, output=stdout, stderr=stderr)
 
+# ==============================================================================
+# 请将您的旧函数替换为下面这个完整的新版本
+# ==============================================================================
 def modify_manifest(manifest_path: str, package_name: str, version_name: str, version_code: str, app_name: str, permissions_to_keep: List[str]):
-    """[已升级] 修改 AndroidManifest.xml，包括移除未被选中的权限"""
+    """
+    [已升级] 修改 AndroidManifest.xml，包括移除未被选中的权限，并动态修复ContentProvider的authorities冲突。
+    """
     import xml.etree.ElementTree as ET
     print(f"🔧 Modifying {manifest_path}...")
+    
+    # 注册 'android' 命名空间，这样ET库才能正确解析和写入 android:xxx 这样的属性
     ET.register_namespace('android', "http://schemas.android.com/apk/res/android")
+    
     tree = ET.parse(manifest_path)
     root = tree.getroot()
     android_ns = '{http://schemas.android.com/apk/res/android}'
     
-    # Part 1: 修改应用属性
+    # --- 步骤 1: 获取原始包名 ---
+    # 在修改它之前，先把它存起来。这是我们用来查找和替换的“关键词”。
+    original_package_name = root.get('package')
+    
+    # --- 步骤 2: 修改应用基本属性 (这部分是您已有的逻辑) ---
     root.set('package', package_name)
     root.set(f'{android_ns}versionCode', version_code)
     root.set(f'{android_ns}versionName', version_name)
+    
     application_node = root.find('application')
     if application_node is not None:
         application_node.set(f'{android_ns}label', app_name)
     else:
         raise FileNotFoundError("<application> tag not found.")
 
-    # --- [新增] Part 2: 根据勾选的列表移除权限 ---
+    # --- 步骤 3: 动态修复 ContentProvider authorities (这是新增的核心逻辑) ---
+    print(f"  🔍 Searching for ContentProviders to fix authorities...")
+    # 这个if判断确保我们只在包名确实被修改时才执行替换，更安全。
+    if original_package_name and original_package_name != package_name:
+        # 遍历 <application> 标签下的所有 <provider> 标签
+        for provider in application_node.findall('provider'):
+            authorities_attr = f'{android_ns}authorities'
+            old_authorities = provider.get(authorities_attr)
+            
+            # 检查这个provider是否有authorities，并且它的值包含了原始包名
+            if old_authorities and original_package_name in old_authorities:
+                # 使用Python的字符串替换功能，生成新的authorities值
+                new_authorities = old_authorities.replace(original_package_name, package_name)
+                
+                # 将计算出的新值设置回provider标签的authorities属性
+                provider.set(authorities_attr, new_authorities)
+                
+                # 打印日志，方便调试和确认
+                print(f"     ✅ Fixed authority: {old_authorities} -> {new_authorities}")
+
+    # --- 步骤 4: 根据勾选的列表移除权限 (这也是您已有的逻辑) ---
     print("  🔥 Pruning permissions...")
     permissions_in_manifest = root.findall('uses-permission')
     for perm_tag in permissions_in_manifest:
@@ -139,6 +172,7 @@ def modify_manifest(manifest_path: str, package_name: str, version_name: str, ve
             print(f"     - Removing permission: {permission_name}")
             root.remove(perm_tag)
     
+    # --- 步骤 5: 将所有修改写回文件 ---
     tree.write(manifest_path, encoding='utf-8', xml_declaration=True)
 
 def repackage_apk(config: dict) -> str:
