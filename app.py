@@ -11,6 +11,11 @@ from urllib.parse import quote
 from typing import Optional, List, Dict, Any
 
 # ==============================================================================
+# 0. 全局缓存 (存储在 Docker 内存中)
+# ==============================================================================
+YYB_COORDINATES = None   # 存储应用宝 JSON 路径坐标
+
+# ==============================================================================
 # 0. Flask 应用初始化
 # ==============================================================================
 app = Flask(__name__)
@@ -63,41 +68,53 @@ def get_apk_permissions(apk_path: str) -> List[str]:
             print(f"❌ Error while scanning permissions: {e}")
             return [] # 如果出错，返回空列表
 
-# --- 全局坐标缓存 ---
-# 格式示例: ["props", "pageProps", "dynamicCardResponse", "data", "components", 0, "data", "itemData"]
-YYB_COORDINATES = []
+
 
 def get_yyb_json(query: str):
-    """底层函数：仅负责获取网页中的 JSON 对象"""
-    url = "https://sj.qq.com/search?q=" + quote(query)
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+    """获取腾讯应用宝网页中的 JSON 数据"""
+    url = f"https://sj.qq.com/search?q={quote(query)}"
+    # 模拟真实 Chrome 浏览器，防止被识别为爬虫返回错误页面
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+        'Referer': 'https://sj.qq.com/'
+    }
     try:
-        response = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(response.text, 'lxml')
-        script_tag = soup.find('script', id='__NEXT_DATA__')
-        return json.loads(script_tag.string) if script_tag else None
-    except:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            print(f"❌ 网页请求失败, 状态码: {resp.status_code}")
+            return None
+        
+        soup = BeautifulSoup(resp.text, 'lxml')
+        tag = soup.find('script', id='__NEXT_DATA__')
+        if not tag:
+            print("❌ 页面未发现 __NEXT_DATA__ 脚本标签 (可能被反爬或改版)")
+            return None
+            
+        return json.loads(tag.string)
+    except Exception as e:
+        print(f"❌ 获取 JSON 发生异常: {e}")
         return None
 
-def find_path_by_value(node: Any, target_val: str, current_path: list) -> Optional[list]:
-    """递归搜索：在JSON树中定位包含目标值的“列表”路径"""
-    # 如果当前是列表，检查里面的字典是否有我们要的包名
+def find_path_to_list(node: Any, target_val: str, current_path: list) -> Optional[list]:
+    """递归寻找包含‘微信’包名的列表路径"""
     if isinstance(node, list):
         for i, item in enumerate(node):
+            # 检查列表中是否直接包含目标包名
             if isinstance(item, dict) and any(v == target_val for v in item.values()):
-                return current_path # 找到了，返回父级（列表）的路径
-            # 继续往深层找
-            if (found := find_path_by_value(item, target_val, current_path + [i])):
+                return current_path
+            # 深度递归
+            if (found := find_path_to_list(item, target_val, current_path + [i])):
                 return found
-    # 如果当前是字典，遍历键值对
     elif isinstance(node, dict):
         for k, v in node.items():
-            if (found := find_path_by_value(v, target_val, current_path + [k])):
+            if (found := find_path_to_list(v, target_val, current_path + [k])):
                 return found
     return None
 
 def get_value_by_path(data: Any, path: list) -> Any:
-    """根据路径安全地从JSON中取值"""
+    """安全地按坐标路径提取数据"""
     try:
         for step in path:
             data = data[step]
@@ -106,50 +123,53 @@ def get_value_by_path(data: Any, path: list) -> Any:
         return None
 
 def search_and_parse(query: str) -> List[Dict[str, str]]:
-    """[自愈版] 搜索并解析腾讯应用宝的应用信息"""
+    """[自愈优化版] 搜索并解析应用信息"""
     global YYB_COORDINATES
-    print(f"🔍 正在搜索: '{query}'")
+    print(f"🔍 正在执行搜索: '{query}'")
     
-    # 1. 获取目标查询的 JSON 数据
     page_data = get_yyb_json(query)
-    if not page_data: return []
+    if not page_data:
+        return []
 
     target_list = None
 
-    # 2. 如果有缓存坐标，先尝试直接取
+    # 1. 尝试使用现有坐标
     if YYB_COORDINATES:
         target_list = get_value_by_path(page_data, YYB_COORDINATES)
     
-    # 3. 坐标失效或初次运行：利用“微信”反推坐标
-    # 逻辑：即使搜支付宝，结果里也常带有微信推荐；如果没有，就专门校准一次。
-    if not isinstance(target_list, list):
-        print("📍 坐标丢失或页面改版，正在定位‘com.tencent.mm’轴点...")
-        # 尝试从当前数据里找微信
-        path = find_path_by_value(page_data, "com.tencent.mm", [])
+    # 2. 如果坐标失效（不是列表或为空），则以“微信”为锚点重新定位
+    if not isinstance(target_list, list) or len(target_list) < 2:
+        print("📍 正在重新定位‘微信’锚点以寻找数据列表...")
+        # 首先尝试在当前结果里找微信（很多搜索页会有推荐）
+        path = find_path_to_list(page_data, "com.tencent.mm", [])
         
         if not path:
-            # 如果当前结果没微信，强制搜一次微信来校准
+            # 如果当前页没有微信，专门搜一次“微信”来校准
             calib_data = get_yyb_json("微信")
-            path = find_path_by_value(calib_data, "com.tencent.mm", [])
-            
+            if calib_data:
+                path = find_path_to_list(calib_data, "com.tencent.mm", [])
+        
         if path:
             YYB_COORDINATES = path
-            print(f"✅ 坐标对焦成功: {' -> '.join(map(str, path))}")
-            target_list = get_value_by_path(page_data, YYB_COORDINATES)
+            print(f"✅ 成功定位新坐标: {' -> '.join(map(str, path))}")
+            target_list = get_value_by_path(page_data, path)
+        else:
+            print("❌ 自动校准失败：无法在页面中发现 com.tencent.mm 锚点")
+            # 最后的倔强：搜索 JSON 中第一个包含 pkg_name 的列表
+            target_list = find_app_list(page_data)
 
-    if not target_list or not isinstance(target_list, list):
-        print("❌ 无法定位应用列表容器")
+    if not target_list:
         return []
 
-    # 4. 万能提取：自适应字段名
-    results = []
+    # 3. 解析结果
+    final_results = []
     for app in target_list:
         if not isinstance(app, dict): continue
-        # 只要字典里看起来像应用信息（有包名），就提取
+        # 只要包含包名，就认为是有效应用项
         pkg = app.get('pkg_name') or app.get('pkgname') or app.get('package_name')
         if not pkg: continue
         
-        results.append({
+        final_results.append({
             "app_name": app.get('name') or app.get('appname') or app.get('title', 'N/A'),
             "developer": app.get('developer') or app.get('operator') or 'N/A',
             "package_name": pkg,
@@ -157,8 +177,8 @@ def search_and_parse(query: str) -> List[Dict[str, str]]:
             "icon_url": app.get('icon') or app.get('icon_url') or ''
         })
     
-    return results
-
+    print(f"✨ 搜索完成，找到 {len(final_results)} 个结果")
+    return final_results
 
 
 # ==============================================================================
